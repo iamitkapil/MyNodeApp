@@ -1,0 +1,91 @@
+name: Lambda Build and Publish
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v3
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v3
+      with:
+        node-version: '18'
+
+    # Step 1: Build Lambda and create function.zip
+    - name: Install deps & zip function
+      run: |
+        chmod +x ./scripts/build-lambda.sh
+        ./scripts/build-lambda.sh
+        ls -lh lambda_function.zip
+
+    # Step 2: Wrap function.zip for artifact
+    #- name: Zip Lambda package for artifact
+    #  run: |
+    #    ZIP_NAME="my-lambda.zip"
+    #    zip -j $ZIP_NAME function.zip
+    #    echo "LAMBDA_ZIP=$ZIP_NAME"
+
+    # Step 3: Zip Terraform code
+    #- name: Zip Terraform directory
+    #  run: |
+    #    ZIP_NAME="terraform-${DATE}.zip"
+    #    zip -r $ZIP_NAME terraform/
+    #    echo "TERRAFORM_ZIP=$ZIP_NAME" >> $GITHUB_ENV
+
+    # Step 4: Publish Lambda artifact
+    - name: Publish Lambda artifact to Devopx
+      env:
+        ARTIFACTORY_TOKEN: ${{ secrets.ARTIFACTORY_APIKEY }}
+      run: |
+        npm install --location=global devopx-cli
+
+        # Set fixed artifact name and target artifact path
+        ARTIFACT_NAME="my-node-app.zip"
+        ARTIFACTORY_PATH="node-app-local/ci-artifact"
+        # Create a timestamp in YYYYMMDDHHMMSS format for versioning
+        DATE=$(date +%Y%m%d%H%M%S)
+        # Use the same filename as the artifact name
+        # Set the full local path for the zip file (current working directory)
+
+         zip -j ${ARTIFACT_NAME} lambda_function.zip
+
+        devopx publish-artifact \
+          --artifact_name "$ARTIFACT_NAME" \
+          --artifact_type "lambda" \
+          --artifact_version "$DATE" \
+          --artifactory_path "$ARTIFACTORY_PATH" \
+          --local_path="$ARTIFACT_NAME" \
+          --artifactory_token "$ARTIFACTORY_TOKEN" \
+          --file_name "my-node-app-$DATE.zip" \
+          --initial_environment "iamitkapil/MyNodeApp_deploy:dev"
+
+    # Step 5: Publish Terraform artifact
+    - name: Publish Terraform artifact to Devopx
+      env:
+        ARTIFACTORY_TOKEN: ${{ secrets.ARTIFACTORY_APIKEY }}
+      run: |
+
+        # Set fixed artifact name and target artifact path
+        ARTIFACT_NAME="terraform.zip"
+        ARTIFACTORY_PATH="node-app-local/ci-artifact"
+        # Create a timestamp in YYYYMMDDHHMMSS format for versioning
+        DATE=$(date +%Y%m%d%H%M%S)
+        # Use the same filename as the artifact name
+        # Set the full local path for the zip file (current working directory)
+        
+        devopx publish-artifact \
+          --artifact_name "$ARTIFACT_NAME" \
+          --artifact_type "terraform" \
+          --artifact_version "$DATE" \
+          --artifactory_path "$ARTIFACTORY_PATH" \
+          --local_path="$ARTIFACT_NAME" \
+          --artifactory_token "$ARTIFACTORY_TOKEN" \
+          --file_name "terraform-$DATE.zip" \
+          --initial_environment "iamitkapil/MyNodeApp_deploy:dev"
