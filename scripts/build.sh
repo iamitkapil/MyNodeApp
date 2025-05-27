@@ -1,6 +1,6 @@
 #!/bin/bash
 
-cd ../Lambda
+cd ./Lambda
 npm install
 zip -r ../lambda_function.zip .
 cd ..
